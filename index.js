@@ -89,22 +89,25 @@ async function main() {
         }
     }
 
-    try {
-        let done = false;
-        for (let loopCount = 0; !done; ++loopCount) {
+    let error = ""
+    let done = false;
+    for (let loopCount = 0; !done; ++loopCount) {
+        try {
             const currentTimestamp = await getTime()
 
             const baseCurrencyAccount = await authedClient.getAccount(baseCurrencyAccountId)
             console.log(`Remaining base currency: ${baseCurrencyAccount.balance} (limit: ${limitBaseCurrency})`)
             const remainingBaseCurrency = parseFloat(baseCurrencyAccount.balance)
             if (remainingBaseCurrency < limitBaseCurrency) {
-                throw new Error(`Remaining base currency under limit.`)
+                error = "Remaining base currency is lower than limit."
+                break;
             }
 
             let remainingAssetsToBuy = []
             for (const asset of assetsToBuy) {
                 try {
                     const result = await placeOrder(asset)
+                    console.log("Received: ", result)
                     if (result.status == 'pending' || result.status == 'open') {
                         pendingOrders.push(result)
                     }
@@ -148,11 +151,16 @@ async function main() {
                 }
             }
 
-            await timeout(loopPeriodMs);
+        } catch (e) {
+            console.error(`[Coinbase]${e}`)
         }
-    } catch (e) {
-        cancelPendingOrders();
-        throw e
+        await timeout(loopPeriodMs);
+    }
+
+    cancelPendingOrders();
+
+    if (error.length > 0) {
+        throw new Error(error);
     }
 }
 
