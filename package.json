@@ -1,0 +1,20 @@
+{
+    "name": "c2ba-coinbase-bot",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "watch": "nodemon --exec npm start"
+    },
+    "keywords": [],
+    "author": "c2ba",
+    "license": "MIT",
+    "devDependencies": {
+        "nodemon": "^1.18.9"
+    },
+    "dependencies": {
+        "gdax": "^0.8.0",
+        "jsonfile-promised": "0.0.1"
+    }
+}
