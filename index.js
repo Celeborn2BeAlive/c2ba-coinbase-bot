@@ -95,6 +95,10 @@ async function main() {
         try {
             const currentTimestamp = await getTime()
 
+            // #note lets say an order is pending, but passed before the previous loop turn and the current
+            // if that order is bringing the remainingBaseCurrency under the limitBaseCurrency
+            // then we have a pending order in pendingOrders that actually passed.
+            // A possible solution is to check is cancelPendingOrders if the order has passed before trying to cancel it.
             const baseCurrencyAccount = await authedClient.getAccount(baseCurrencyAccountId)
             //console.log(`Remaining base currency: ${baseCurrencyAccount.balance} (limit: ${limitBaseCurrency})`)
             const remainingBaseCurrency = parseFloat(baseCurrencyAccount.balance)
