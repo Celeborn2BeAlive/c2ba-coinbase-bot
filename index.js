@@ -9,8 +9,6 @@ function timeout(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-const loopPeriod = 1000 // milliseconds
-
 function suffixToMultiplier(suffix) {
     const s = 1000
     const m = 60 * s
@@ -21,7 +19,7 @@ function suffixToMultiplier(suffix) {
     return { s, m, h, d, w }[suffix]
 }
 
-function investPeriodToMilliseconds(investPeriod) {
+function periodToMilliseconds(investPeriod) {
     const number = parseInt(investPeriod.substr(0, investPeriod.length - 1))
     const suffix = investPeriod.substr(investPeriod.length - 1, 1)
     const multiplier = suffixToMultiplier(suffix)
@@ -30,19 +28,24 @@ function investPeriodToMilliseconds(investPeriod) {
 }
 
 async function main() {
-    const pathToState = path.join(process.argv[2], 'state.json')
     const pathToConfig = path.join(process.argv[2], 'config.json')
 
-    const { apiKey, apiSecret, passPhrase, investPeriod, investAmount, baseCurrency, cancelAfter } = await jsonfile.readFile(pathToConfig)
+    const { apiKey, apiSecret, passPhrase, investPeriod, loopPeriod, investAmount,
+        baseCurrency, cancelAfter, limitBaseCurrency } = await jsonfile.readFile(pathToConfig)
 
     const publicClient = new Gdax.PublicClient()
     const authedClient = new Gdax.AuthenticatedClient(apiKey, apiSecret, passPhrase, apiURI)
 
-    const investPeriodMs = investPeriodToMilliseconds(investPeriod)
+    const investPeriodMs = periodToMilliseconds(investPeriod)
+    const loopPeriodMs = periodToMilliseconds(loopPeriod)
 
     const getTime = async () => {
         return parseInt((await publicClient.getTime()).epoch * 1000)
     }
+
+    const accounts = await authedClient.getAccounts()
+    const baseCurrencyAccountId = accounts.filter(account => account.currency == baseCurrency)[0].id
+    console.log("baseCurrencyAccountId: ", baseCurrencyAccountId)
 
     const currentTimestamp = await getTime()
     const previousPeriodIdx = Math.floor(currentTimestamp / investPeriodMs)
@@ -75,65 +78,90 @@ async function main() {
         return await authedClient.placeOrder(params)
     }
 
-    let done = false;
-    for (let loopCount = 0; !done; ++loopCount) {
-        const currentTimestamp = await getTime()
-
-        let remainingAssetsToBuy = []
-        for (const asset of assetsToBuy) {
+    const cancelPendingOrders = async () => {
+        console.log(`Cancel ${pendingOrders.length} pending orders`)
+        for (const order of pendingOrders) {
             try {
-                const result = await placeOrder(asset)
-                if (result.status == 'pending' || result.status == 'open') {
-                    pendingOrders.push(result)
-                }
-
+                await authedClient.cancelOrder(order.id)
             } catch (e) {
-                console.log('Order rejected: ', result)
-                remainingAssetsToBuy.push(asset)
+                console.log(`${e}`)
             }
         }
-        assetsToBuy = remainingAssetsToBuy
+    }
 
-        if (pendingOrders.length > 0) {
-            let openOrders = []
-            for (const order of pendingOrders) {
+    try {
+        let done = false;
+        for (let loopCount = 0; !done; ++loopCount) {
+            const currentTimestamp = await getTime()
+
+            const baseCurrencyAccount = await authedClient.getAccount(baseCurrencyAccountId)
+            console.log(`Remaining base currency: ${baseCurrencyAccount.balance} (limit: ${limitBaseCurrency})`)
+            const remainingBaseCurrency = parseFloat(baseCurrencyAccount.balance)
+            if (remainingBaseCurrency < limitBaseCurrency) {
+                throw new Error(`Remaining base currency under limit.`)
+            }
+
+            let remainingAssetsToBuy = []
+            for (const asset of assetsToBuy) {
                 try {
-                    const result = await authedClient.getOrder(order.id)
-                    if (result.status == "open") {
-                        openOrders.push(order)
-                        console.log(`Wait for opened order ${order.id}...`)
-                    } else {
-                        console.log("Order done :", result)
+                    const result = await placeOrder(asset)
+                    if (result.status == 'pending' || result.status == 'open') {
+                        pendingOrders.push(result)
                     }
+
                 } catch (e) {
-                    // Order was cancelled, try again
-                    assetsToBuy.push(order.product_id.split('-')[0])
-                    console.log(`Order ${order.id} canceled, trying again`)
+                    console.log('Order rejected: ', result)
+                    remainingAssetsToBuy.push(asset)
+                }
+            }
+            assetsToBuy = remainingAssetsToBuy
+
+            if (pendingOrders.length > 0) {
+                let openOrders = []
+                for (const order of pendingOrders) {
+                    try {
+                        const result = await authedClient.getOrder(order.id)
+                        if (result.status == "open") {
+                            openOrders.push(order)
+                            console.log(`Wait for opened order ${order.id}...`)
+                        } else {
+                            console.log("Order done :", result)
+                        }
+                    } catch (e) {
+                        // Order was cancelled, try again
+                        assetsToBuy.push(order.product_id.split('-')[0])
+                        console.log(`Order ${order.id} canceled, trying again`)
+                    }
+                }
+
+                pendingOrders = openOrders
+            } else {
+                const msRemaining = nextPeriodTimestamp - currentTimestamp
+
+                console.log(`Next investment time: ${new Date(nextPeriodTimestamp)} (${msRemaining} milliseconds remaining)`)
+
+                if (msRemaining < 0) {
+                    for (const asset in investAmount) {
+                        assetsToBuy.push(asset)
+                    }
+                    nextPeriodTimestamp += investPeriodMs // Update timestamp to wait the next period
                 }
             }
 
-            pendingOrders = openOrders
-        } else {
-            const msRemaining = nextPeriodTimestamp - currentTimestamp
-
-            console.log(msRemaining)
-
-            if (msRemaining < 0) {
-                for (const asset in investAmount) {
-                    assetsToBuy.push(asset)
-                }
-                nextPeriodTimestamp += investPeriodMs // Update timestamp to wait the next period
-            }
+            await timeout(loopPeriodMs);
         }
-
-        await timeout(loopPeriod);
+    } catch (e) {
+        cancelPendingOrders();
+        throw e
     }
 }
 
+// Run main, catch and print any error
 (async () => {
     try {
         await main()
     } catch (e) {
-        console.log(`${e} `)
+        console.error(`${e}`)
+        process.exit(-1)
     }
 })()
