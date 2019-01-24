@@ -96,7 +96,7 @@ async function main() {
             const currentTimestamp = await getTime()
 
             const baseCurrencyAccount = await authedClient.getAccount(baseCurrencyAccountId)
-            console.log(`Remaining base currency: ${baseCurrencyAccount.balance} (limit: ${limitBaseCurrency})`)
+            //console.log(`Remaining base currency: ${baseCurrencyAccount.balance} (limit: ${limitBaseCurrency})`)
             const remainingBaseCurrency = parseFloat(baseCurrencyAccount.balance)
             if (remainingBaseCurrency < limitBaseCurrency) {
                 error = "Remaining base currency is lower than limit."
@@ -107,7 +107,7 @@ async function main() {
             for (const asset of assetsToBuy) {
                 try {
                     const result = await placeOrder(asset)
-                    console.log("Received: ", result)
+                    console.log("Result: ", result)
                     if (result.status == 'pending' || result.status == 'open') {
                         pendingOrders.push(result)
                     }
@@ -121,12 +121,12 @@ async function main() {
 
             if (pendingOrders.length > 0) {
                 let openOrders = []
+                console.log(`Wait for orders ${pendingOrders}...`)
                 for (const order of pendingOrders) {
                     try {
                         const result = await authedClient.getOrder(order.id)
                         if (result.status == "open") {
                             openOrders.push(order)
-                            console.log(`Wait for opened order ${order.id}...`)
                         } else {
                             console.log("Order done :", result)
                         }
