@@ -16,7 +16,12 @@ function suffixToMultiplier(suffix) {
     const d = 24 * h
     const w = 7 * d
 
-    return { s, m, h, d, w }[suffix]
+    const map = { s, m, h, d, w }
+    if (!(suffix in map)) {
+        throw new Error(`${suffix} not recognized for period.`)
+    }
+
+    return map[suffix]
 }
 
 function periodToMilliseconds(investPeriod) {
@@ -30,8 +35,8 @@ function periodToMilliseconds(investPeriod) {
 async function main() {
     const pathToConfig = path.join(process.argv[2], 'config.json')
 
-    const { apiKey, apiSecret, passPhrase, investPeriod, loopPeriod, investAmount,
-        baseCurrency, cancelAfter, limitBaseCurrency } = await jsonfile.readFile(pathToConfig)
+    const { apiKey, apiSecret, passPhrase, investTimeOrigin, investPeriod, loopPeriod, investAmount,
+        baseCurrency, cancelAfter, limitBaseCurrency, printStatePeriod } = await jsonfile.readFile(pathToConfig)
 
     const publicClient = new Gdax.PublicClient()
     const authedClient = new Gdax.AuthenticatedClient(apiKey, apiSecret, passPhrase, apiURI)
@@ -39,23 +44,33 @@ async function main() {
     const investPeriodMs = periodToMilliseconds(investPeriod)
     const loopPeriodMs = periodToMilliseconds(loopPeriod)
 
+    const originTimestamp = Date.parse(investTimeOrigin)
     const getTime = async () => {
         return parseInt((await publicClient.getTime()).epoch * 1000)
     }
 
     const accounts = await authedClient.getAccounts()
     const baseCurrencyAccountId = accounts.filter(account => account.currency == baseCurrency)[0].id
-    console.log("baseCurrencyAccountId: ", baseCurrencyAccountId)
+    console.log(`baseCurrencyAccountId ${baseCurrencyAccountId}\n`)
 
-    const currentTimestamp = await getTime()
+    const currentTimestamp = await getTime() - originTimestamp
     const previousPeriodIdx = Math.floor(currentTimestamp / investPeriodMs)
-    const previousPeriodTimestamp = previousPeriodIdx * investPeriodMs
-    let nextPeriodTimestamp = (previousPeriodIdx + 1) * investPeriodMs
+    let nextPeriodTimestamp = originTimestamp + (previousPeriodIdx + 1) * investPeriodMs
 
     let pendingOrders = []
     let assetsToBuy = []
 
+    const genFakeOrder = asset => {
+        return { id: "0", product_id: asset + '-' + baseCurrency, status: "pending" }
+    }
+
+    const fake = false
+
     const placeOrder = async asset => {
+        if (fake) {
+            return genFakeOrder(asset)
+        }
+
         const market = asset + '-' + baseCurrency
         const allOrders = await publicClient.getProductOrderBook(market, { level: 2 });
 
@@ -78,6 +93,28 @@ async function main() {
         return await authedClient.placeOrder(params)
     }
 
+    const checkStatus = async order => {
+        if (fake) {
+            console.log("Order fake filled.")
+            return null
+        }
+
+        try {
+            const result = await authedClient.getOrder(order.id)
+            if (result.status == "open") {
+                return order
+            } else {
+                console.log("Order filled :", result)
+                return null
+            }
+        } catch (e) {
+            // Order was cancelled, try to buy again
+            assetsToBuy.push(order.product_id.split('-')[0])
+            console.log(`Order ${order.id} canceled, trying again`)
+            return null
+        }
+    }
+
     const cancelPendingOrders = async () => {
         console.log(`Cancel ${pendingOrders.length} pending orders`)
         for (const order of pendingOrders) {
@@ -94,19 +131,37 @@ async function main() {
     for (let loopCount = 0; !done; ++loopCount) {
         try {
             const currentTimestamp = await getTime()
-
-            // #note lets say an order is pending, but passed before the previous loop turn and the current
-            // if that order is bringing the remainingBaseCurrency under the limitBaseCurrency
-            // then we have a pending order in pendingOrders that actually passed.
-            // A possible solution is to check is cancelPendingOrders if the order has passed before trying to cancel it.
+            const msRemaining = nextPeriodTimestamp - currentTimestamp
             const baseCurrencyAccount = await authedClient.getAccount(baseCurrencyAccountId)
-            //console.log(`Remaining base currency: ${baseCurrencyAccount.balance} (limit: ${limitBaseCurrency})`)
             const remainingBaseCurrency = parseFloat(baseCurrencyAccount.balance)
+
+            if (loopCount % printStatePeriod == 0) {
+                console.log("--State--")
+                console.log(`  assetsToBuy: ${assetsToBuy}`)
+                console.log(`  pendingOrders: ${pendingOrders.map(order => order.id)}`)
+                console.log(`  remainingBaseCurrency: ${remainingBaseCurrency}`)
+                console.log(`  Next investment time: ${new Date(nextPeriodTimestamp)} (${msRemaining / 1000.0} seconds remaining)`)
+                console.log("--")
+            }
+
+            // If we have pending orders, check if they have been filled or canceled
+            if (pendingOrders.length > 0) {
+                let openOrders = []
+                for (const order of pendingOrders) {
+                    const maybeOrder = await checkStatus(order)
+                    if (maybeOrder) {
+                        openOrders.push(maybeOrder)
+                    }
+                }
+                pendingOrders = openOrders
+            }
+
             if (remainingBaseCurrency < limitBaseCurrency) {
                 error = "Remaining base currency is lower than limit."
                 break;
             }
 
+            // If we have assets to buy, then place orders for them
             let remainingAssetsToBuy = []
             for (const asset of assetsToBuy) {
                 try {
@@ -123,40 +178,19 @@ async function main() {
             }
             assetsToBuy = remainingAssetsToBuy
 
-            if (pendingOrders.length > 0) {
-                let openOrders = []
-                console.log(`Wait for orders ${pendingOrders}...`)
-                for (const order of pendingOrders) {
-                    try {
-                        const result = await authedClient.getOrder(order.id)
-                        if (result.status == "open") {
-                            openOrders.push(order)
-                        } else {
-                            console.log("Order done :", result)
-                        }
-                    } catch (e) {
-                        // Order was cancelled, try again
-                        assetsToBuy.push(order.product_id.split('-')[0])
-                        console.log(`Order ${order.id} canceled, trying again`)
-                    }
+            // If we are idle, and an invest period has passed, then try to buy again next loop turn
+            if (assetsToBuy.length == 0 && pendingOrders.length == 0 && msRemaining < 0) {
+                for (const asset in investAmount) {
+                    assetsToBuy.push(asset)
                 }
+                const previousPeriodIdx = Math.floor((currentTimestamp - originTimestamp) / investPeriodMs)
+                nextPeriodTimestamp = originTimestamp + (previousPeriodIdx + 1) * investPeriodMs
 
-                pendingOrders = openOrders
-            } else {
-                const msRemaining = nextPeriodTimestamp - currentTimestamp
-
-                console.log(`Next investment time: ${new Date(nextPeriodTimestamp)} (${msRemaining} milliseconds remaining)`)
-
-                if (msRemaining < 0) {
-                    for (const asset in investAmount) {
-                        assetsToBuy.push(asset)
-                    }
-                    nextPeriodTimestamp += investPeriodMs // Update timestamp to wait the next period
-                }
+                //nextPeriodTimestamp += investPeriodMs // Update timestamp to wait the next period
             }
 
         } catch (e) {
-            console.error(`[Coinbase]${e}`)
+            console.error(`[Coinbase] ${e}`)
         }
         await timeout(loopPeriodMs);
     }
