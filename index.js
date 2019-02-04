@@ -1,13 +1,9 @@
 const jsonfile = require('jsonfile-promised');
 const path = require('path')
 const Gdax = require('gdax')
+const { timeout, coinbaseURI } = require('./utils')
 
-const apiURI = 'https://api.pro.coinbase.com'
-const sandboxURI = 'https://api-public.sandbox.pro.coinbase.com'
-
-function timeout(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+const { api: apiURI } = coinbaseURI
 
 function suffixToMultiplier(suffix) {
     const s = 1000
