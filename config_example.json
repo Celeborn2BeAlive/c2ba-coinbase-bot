@@ -1,0 +1,14 @@
+{
+    "apiKey": "",
+    "apiSecret": "",
+    "passPhrase": "",
+    "investTimeOrigin": "01 Jan 1970 00:00:00 GMT",
+    "investPeriod": "1w",
+    "loopPeriod": "1m",
+    "investAmount": "5",
+    "baseCurrency": "EUR",
+    "cancelAfter": "hour",
+    "limitBaseCurrency": "25",
+    "printStatePeriod": 10,
+    "fake": true
+}

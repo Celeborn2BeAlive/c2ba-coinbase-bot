@@ -36,7 +36,13 @@ async function main() {
     const pathToConfig = path.join(process.argv[2], 'config.json')
 
     const { apiKey, apiSecret, passPhrase, investTimeOrigin, investPeriod, loopPeriod, investAmount,
-        baseCurrency, cancelAfter, limitBaseCurrency, printStatePeriod } = await jsonfile.readFile(pathToConfig)
+        baseCurrency, cancelAfter, limitBaseCurrency, printStatePeriod, fake } = await jsonfile.readFile(pathToConfig)
+
+    if (fake) {
+        console.log("Fake mode enabled.")
+    } else {
+        console.log("Real mode enabled.")
+    }
 
     const publicClient = new Gdax.PublicClient()
     const authedClient = new Gdax.AuthenticatedClient(apiKey, apiSecret, passPhrase, apiURI)
@@ -63,8 +69,6 @@ async function main() {
     const genFakeOrder = asset => {
         return { id: "0", product_id: asset + '-' + baseCurrency, status: "pending" }
     }
-
-    const fake = false
 
     const placeOrder = async asset => {
         if (fake) {
