@@ -1,19 +1,8 @@
 const jsonfile = require('jsonfile-promised')
-const path = require('path')
 const Gdax = require('gdax')
-const { coinbaseURI } = require('./utils')
+const { coinbaseURI, getAccountHistory } = require('./utils')
 
 const { api: apiURI } = coinbaseURI
-
-async function getAccountHistory(authedClient, accountId, after) {
-    const h = await (async () => {
-        if (after > 0)
-            return await authedClient.getAccountHistory(accountId, { after })
-        else
-            return await authedClient.getAccountHistory(accountId)
-    })()
-    return h.length > 0 ? h.concat(await getAccountHistory(authedClient, accountId, h[h.length - 1].id)) : []
-}
 
 async function main() {
     const pathToConfig = process.argv[2]
