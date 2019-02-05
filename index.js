@@ -202,12 +202,4 @@ async function main() {
     }
 }
 
-// Run main, catch and print any error
-(async () => {
-    try {
-        await main()
-    } catch (e) {
-        console.error(`${e}`)
-        process.exit(-1)
-    }
-})()
+main()
