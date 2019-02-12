@@ -2,6 +2,8 @@ const jsonfile = require('jsonfile-promised')
 const { coinbaseURI, getAccountHistory } = require('./utils')
 const Gdax = require('gdax')
 const Aigle = require('aigle')
+const Handlebars = require('handlebars')
+const fs = require('fs')
 
 const lodash = require('lodash')
 const { reverse } = lodash
@@ -94,9 +96,9 @@ async function main() {
         let quantity = 0
         let realizedPnL = 0
         let events = []
-        let depositAmount = 0
-        let withdrawAmount = 0
-        let withdrawAmountValue = 0
+        let depositQuantity = 0
+        let withdrawnQuantity = 0
+        let withdrawnValue = 0
         for (const event of reverse(account.history)) {
             if (event.type == "match") {
                 if (processedOrders.has(event.details.order_id))
@@ -197,8 +199,8 @@ async function main() {
                         date: transfer.completed_at
                     })
                     quantity = newQty
-                    withdrawAmount += amount
-                    withdrawAmountValue += amount * averageUnitCost
+                    withdrawnQuantity += amount
+                    withdrawnValue += amount * averageUnitCost
                     averageUnitCost = newAUC
                 } else {
                     const newQty = quantity + amount
@@ -211,7 +213,7 @@ async function main() {
                         date: transfer.completed_at
                     })
                     quantity = newQty
-                    depositAmount += amount
+                    depositQuantity += amount
                 }
             }
         }
@@ -222,7 +224,11 @@ async function main() {
         const unitPnL = price - averageUnitCost
         const unrealizedPnL = unitPnL * quantity
 
-        const balance = parseFloat(account.balance)
+        const balance = account.balance
+
+        if (quantity.toFixed(16) != balance) {
+            console.error(`Balance ${balance} for ${account.currency} on coinbase not matching computed quantity ${quantity}.`)
+        }
 
         const report = {
             currency: account.currency,
@@ -233,12 +239,12 @@ async function main() {
             unrealizedPnL,
             value: quantity * price,
             cost: quantity * averageUnitCost,
-            withdrawAmount,
-            withdrawAmountValue,
-            depositAmount,
+            withdrawnQuantity,
+            withdrawnValue,
+            depositQuantity,
             balance
         }
-        coherencyTest -= (withdrawAmountValue + report.cost)
+        coherencyTest -= (withdrawnValue + report.cost)
         coherencyTest += realizedPnL
 
         output[account.currency] = {
@@ -248,9 +254,40 @@ async function main() {
     }
 
     // Should be almost zero
-    console.log(coherencyTest)
+    if (Math.abs(coherencyTest) > 0.01)
+        console.error(`Coherency error ${coherencyTest} between computed deposits, withdraw, buys and sells`)
 
     await jsonfile.writeFile("report.json", output, { spaces: 2 })
+
+    const reportTemplate = fs.readFileSync("report_template.html", "utf8")
+
+    const portfolioLines = await chain(output)
+        .values()
+        .map(o => o.report)
+        .filter(r => r.currency != quoteCurrency)
+        .map(r => {
+            return {
+                currency: r.currency,
+                price: r.price.toString(),
+                quantity: r.quantity.toFixed(8),
+                value: r.value.toFixed(2),
+                avgUnitCost: r.averageUnitCost.toFixed(2),
+                totalCost: r.cost.toFixed(2),
+                unrealizedPnL: r.unrealizedPnL.toFixed(2),
+                unrealizedPnLPercent: (100.0 * r.unrealizedPnL / r.value).toFixed(2),
+                realizedPnL: r.realizedPnL.toFixed(2),
+                withdrawnQty: r.withdrawnQuantity.toFixed(8),
+                withdrawnValue: r.withdrawnValue.toFixed(2),
+                depositQty: r.depositQuantity.toFixed(8),
+            }
+        })
+
+    const template = Handlebars.compile(reportTemplate)
+    const html = template({
+        portfolioLines
+    })
+
+    fs.writeFileSync("report.html", html)
 }
 
 main()

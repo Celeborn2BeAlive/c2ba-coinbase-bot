@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>{{title}}</title>
+  <style>
+    * {
+      font-family: Helvetica;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      text-align: left;
+      padding: 8px;
+    }
+
+    tr:nth-child(even) {
+      background-color: #f2f2f2;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>{{title}}</h1>
+  <table>
+    <thead>
+      <th></th>
+      <th>Price</th>
+      <th>Quantity</th>
+      <th>Value</th>
+      <th>Avg Unit Cost</th>
+      <th>Total cost</th>
+      <th>Unrealized PnL</th>
+      <th>Unrealized PnL (%)</th>
+      <th>Withdrawn Qty</th>
+      <th>Withdrawn Value</th>
+      <th>Deposit Qty</th>
+      <th>Realized PnL</th>
+    </thead>
+    <tbody>
+      {{#each portfolioLines}}
+      <tr>
+        <td>{{currency}}</td>
+        <td>{{price}}</td>
+        <td>{{quantity}}</td>
+        <td>{{value}}</td>
+        <td>{{avgUnitCost}}</td>
+        <td>{{totalCost}}</td>
+        <td>{{unrealizedPnL}}</td>
+        <td>{{unrealizedPnLPercent}}</td>
+        <td>{{withdrawnQty}}</td>
+        <td>{{withdrawnValue}}</td>
+        <td>{{depositQty}}</td>
+        <td>{{realizedPnL}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+</body>
+
+</html>
