@@ -17,8 +17,6 @@ async function main() {
         throw new Error("No path to history file provided.")
     }
 
-    const publicClient = new Gdax.PublicClient(apiURI)
-
     const quoteCurrency = "EUR"
     const { accounts, orders } = await jsonfile.readFile(pathToHistory)
 
@@ -218,6 +216,7 @@ async function main() {
             }
         }
 
+        const publicClient = new Gdax.PublicClient(apiURI)
         const ticker = await publicClient.getProductTicker(account.currency + '-EUR');
         const price = parseFloat(ticker.price)
 
