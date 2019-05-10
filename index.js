@@ -331,7 +331,7 @@ async function main() {
                 }
                 pendingOrders = openOrders
 
-                if (pendingOrders.length == 0 && investCountLimit > 0) {
+                if (pendingOrders.length == 0 && investCountLimit && investCountLimit > 0) {
                     ++investCount
                 }
             }
@@ -371,7 +371,7 @@ async function main() {
             assetsToBuy = remainingAssetsToBuy
 
             // If we are idle, and an invest period has passed, then try to buy again next loop turn
-            if (assetsToBuy.length == 0 && pendingOrders.length == 0 && msRemaining < 0 && (investCountLimit == 0 || investCount < investCountLimit)) {
+            if (assetsToBuy.length == 0 && pendingOrders.length == 0 && msRemaining < 0 && (!investCountLimit || investCountLimit == 0 || investCount < investCountLimit)) {
                 for (const asset in investAmount) {
                     assetsToBuy.push(asset)
                 }
