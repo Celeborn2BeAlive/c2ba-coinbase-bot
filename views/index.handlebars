@@ -1,0 +1,99 @@
+{{> _header}}
+
+{{#if fake}}
+Fake mode enabled.
+{{else}}
+Real mode enabled.
+{{/if}}
+
+<p>Next date buying: {{ nextBuyingTime }}.</p>
+<p>{{ days }} days {{ hours }} hours {{ minutes }} minutes {{ seconds }} seconds remaining.</p>
+
+<p>Invest count: {{ investCount }}</p>
+<p>Invest count limit: {{ investCountLimit }}</p>
+
+<h2>Assets Info</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>currency</th>
+            <th>price</th>
+            <th>buySize</th>
+            <th>buyValue</th>
+            <th>wantedBuyValue</th>
+            <th>wantedSize</th>
+            <th>minSize</th>
+            <th>maxSize</th>
+            <th>minValue</th>
+            <th>maxValue</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{#each assetInfo}}
+        <tr>
+            <td>{{ currency }}</td>
+            <td>{{ price }}</td>
+            <td>{{ buySize }}</td>
+            <td>{{ buyValue }}</td>
+            <td>{{ wantedBuyValue }}</td>
+            <td>{{ wantedSize }}</td>
+            <td>{{ minSize }}</td>
+            <td>{{ maxSize }}</td>
+            <td>{{ minValue }}</td>
+            <td>{{ maxValue }}</td>
+        </tr>
+        {{/each}}
+    </tbody>
+</table>
+
+<h2>Assets to buy</h2>
+
+<ul>
+    {{#each assetsToBuy}}
+    <li>{{this}}</li>
+    {{/each}}
+</ul>
+
+<h2>Pending Orders</h2>
+
+<table>
+    <thead>
+        <tr>
+            <th>id</th>
+            <th>price</th>
+            <th>size</th>
+            <th>product_id</th>
+            <th>side</th>
+            <th>stp</th>
+            <th>type</th>
+            <th>time_in_force</th>
+            <th>created_at</th>
+            <th>fill_fees</th>
+            <th>filled_size</th>
+            <th>executed_value</th>
+            <th>status</th>
+            <th>seconds_to_fill</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{#each pendingOrders}}
+        <tr>
+            <td>{{ id }}</td>
+            <td>{{ price }}</td>
+            <td>{{ size }}</td>
+            <td>{{ product_id }}</td>
+            <td>{{ side }}</td>
+            <td>{{ stp }}</td>
+            <td>{{ type }}</td>
+            <td>{{ time_in_force }}</td>
+            <td>{{ created_at }}</td>
+            <td>{{ fill_fees }}</td>
+            <td>{{ filled_size }}</td>
+            <td>{{ executed_value }}</td>
+            <td>{{ status }}</td>
+            <td>{{ seconds_to_fill }}</td>
+        </tr>
+        {{/each}}
+    </tbody>
+</table>

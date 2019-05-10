@@ -15,6 +15,8 @@
     },
     "dependencies": {
         "aigle": "^1.13.0",
+        "express": "^4.16.4",
+        "express-handlebars": "^3.0.2",
         "gdax": "^0.8.0",
         "handlebars": "^4.1.0",
         "jsonfile-promised": "0.0.1",

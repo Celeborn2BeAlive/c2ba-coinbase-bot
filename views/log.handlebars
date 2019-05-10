@@ -1,0 +1,15 @@
+<h2>Log</h2>
+
+{{#each history}}
+<p>
+    {{ time }}<br>
+    {{ action }}<br>
+    params:<br>
+    <ul>
+        {{#each params as |value key|}}
+        <li>{{ key }} : {{ value }}</li>
+        {{/each}}
+    </ul>
+</p>
+<hr>
+{{/each}}

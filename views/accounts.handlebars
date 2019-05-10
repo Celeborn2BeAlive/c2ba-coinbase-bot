@@ -1,0 +1,31 @@
+<h1>Accounts</h1>
+
+<p>Base currency: {{ baseCurrency }}</p>
+<p>Portfolio value: {{ portfolioValue }}</p>
+
+<table>
+    <thead>
+        <tr>
+            <th>Currency</th>
+            <th>Id</th>
+            <th>Balance</th>
+            <th>Available</th>
+            <th>Hold</th>
+            <th>Value</th>
+            <th>%</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{#each accounts}}
+        <tr>
+            <td>{{ id }}</td>
+            <td>{{ currency }}</td>
+            <td>{{ balance }}</td>
+            <td>{{ available }}</td>
+            <td>{{ hold }}</td>
+            <td>{{ value }}</td>
+            <td>{{ percentage }}</td>
+        </tr>
+        {{/each}}
+    </tbody>
+</table>
