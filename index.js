@@ -382,7 +382,7 @@ async function main() {
         } catch (e) {
             console.error(`[Coinbase] ${e}`)
             history.push({
-                time: await getDate(),
+                time: new Date(),
                 action: "exception_catched",
                 params: e
             })
